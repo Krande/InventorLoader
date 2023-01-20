@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from FreeCAD import Vector as VEC
+from acis_loader_base import VEC
 from math    import pi
 
 REF_CROSS    = 1

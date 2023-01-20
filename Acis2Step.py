@@ -4,13 +4,16 @@
 Acis2Step.py:
 '''
 
-from datetime          import datetime
-from importerUtils     import isEqual, getDumpFolder
-from FreeCAD           import Vector as VEC, Placement as PLC
-from importerUtils     import logInfo, logWarning, logError, logAlways, isEqual1D, getAuthor, getDescription, getColorDefault
-from importerConstants import CENTER, DIR_X, DIR_Y, DIR_Z, ENCODING_FS
+import io
+import math
+import os
+import sys
+from datetime import datetime
 
-import traceback, inspect, os, sys, Acis, math, re, Part, io
+import acis_loader_utils as Acis
+from acis_loader_base import Part
+from acis_loader_utils import *
+from importerConstants import DIR_X, DIR_Y
 
 #############################################################
 # private variables
@@ -76,7 +79,6 @@ def _obj2str(o):
 	if (type(o) == int):              return u"%d" %(o)
 	if (sys.version_info.major < 3):
 		if (type(o) == long):         return u"%d" %(o)
-		if (type(o) == unicode):      return _str2str(o)
 	if (type(o) == float):            return _dbl2str(o)
 	if (type(o) == bool):             return _bool2str(o)
 	if (type(o) == str):              return _str2str(o)
@@ -1445,10 +1447,10 @@ class GROUP(NamedEntity):
 # Global functions
 #############################################################
 
-def export(filename, satHeader, satBodies):
+def export(filename, satHeader, satBodies, step_path):
 	dt     = datetime.now() # 2018-05-13T08:03:27-07:00
-	user   = getAuthor()
-	desc   = getDescription()
+	user   = "getAuthor()"
+	desc   = "getDescription()"
 	orga   = ''
 	proc   = 'InventorImporter 0.9'
 	auth   = ''
@@ -1467,7 +1469,7 @@ def export(filename, satHeader, satBodies):
 
 	path, f = os.path.split(filename)
 	name, x = os.path.splitext(f)
-	path = getDumpFolder().replace('\\', '/')
+	path = step_path
 	stepfile = "%s/%s.step" %(path, name)
 
 	step = u"ISO-10303-21;\n"
@@ -1495,7 +1497,7 @@ def export(filename, satHeader, satBodies):
 	with io.open(stepfile, 'wt', encoding="UTF-8") as stepFile:
 		stepFile.write(step)
 #		logAlways(u"STEP file written to '%s'.", stepfile)
-		logInfo(u"STEP file written to '%s'.", stepfile)
+		# logInfo(u"STEP file written to '%s'.", stepfile)
 
 	_finalizeExport()
 

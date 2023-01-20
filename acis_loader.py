@@ -7,20 +7,18 @@ Collection of classes necessary to read and analyse Standard ACIS Text (*.sat) f
 
 from __future__ import unicode_literals
 
-import traceback, os, re
-
-from importerUtils import *
+import re
+import sys
+import datetime
 from math import (
     pi,
     fabs,
     degrees,
-    asin,
     sin,
     cos,
     tan,
     atan2,
     ceil,
-    e,
     cosh,
     sinh,
     tanh,
@@ -35,14 +33,10 @@ from math import (
     exp,
     log10,
 )
-from importerConstants import MIN_0, MIN_PI, MIN_PI2, MIN_INF, MAX_2PI, MAX_PI, MAX_PI2, MAX_INF, MAX_LEN
+from acis_loader_utils import *
+from acis_loader_base import VEC, Part
 from importerConstants import CENTER, DIR_X, DIR_Y, DIR_Z, ENCODING_FS
-
-__author__ = "Jens M. Plonka"
-__copyright__ = "Copyright 2018, Germany"
-__url__ = "https://www.github.com/jmplonka/InventorLoader"
-
-V2D = Base.Vector2d
+from importerConstants import MIN_0, MIN_PI, MIN_PI2, MIN_INF, MAX_2PI, MAX_PI, MAX_PI2, MAX_INF, MAX_LEN
 
 # Primitives for Binary File Format (.sab)
 TAG_CHAR = 2  # character (unsigned 8 bit)
@@ -50,7 +44,7 @@ TAG_SHORT = 3  # 16Bit signed value
 TAG_LONG = 4  # 32/64Bit signed value
 TAG_FLOAT = 5  # 32Bit IEEE Float value
 TAG_DOUBLE = 6  # 64Bit IEEE Float value
-TAG_UTF8_U8 = 7  #  8Bit length + UTF8-Char
+TAG_UTF8_U8 = 7  # 8Bit length + UTF8-Char
 TAG_UTF8_U16 = 8  # 16Bit length + UTF8-Char
 TAG_UTF8_U32_A = 9  # 32Bit length + UTF8-Char
 TAG_TRUE = 10  # Logical true value
@@ -67,6 +61,7 @@ TAG_VECTOR_3D = 20  # 3D-Vector normalized
 TAG_ENUM_VALUE = 21  # value of an enumeration
 TAG_VECTOR_2D = 22  # U-V-Vector
 TAG_INT64 = 23  # used by AutoCAD ASM int64 attributes
+
 
 # TAG_FALSE, TAG_TRUE value mappings
 def _build_bool_enum_(false_value, true_value, true_key="T"):
@@ -226,7 +221,7 @@ def ARCCSC(x):
 
 
 def ARCCSCH(x):
-    return log((1 + sqrt(1 + x**2)) / x)
+    return log((1 + sqrt(1 + x ** 2)) / x)
 
 
 def ARCSEC(x):
@@ -234,7 +229,7 @@ def ARCSEC(x):
 
 
 def ARCSECH(x):
-    return log((1 + sqrt(1 - x**2)) / x)
+    return log((1 + sqrt(1 - x ** 2)) / x)
 
 
 def ARCSIN(x):
@@ -2449,7 +2444,7 @@ class CurveDegenerate(Curve):  # degenerate curve "degenerate-curve"
         return "%s %s" % (self.start, self.range)
 
     def __repr__(self):
-        return "Curve-Degenerate %s %s #" % s(self.start, self.range)
+        return f"Curve-Degenerate {self.start} {self.range} #"
 
     def setSubtype(self, chunks, index):
         self.start, i = getLocation(chunks, index)
@@ -5900,10 +5895,7 @@ class AcisChunkEnumValue(_AcisChunk_):
         self.values = values
 
     def __repr__(self):
-        try:
-            return "%s " % (values[self.val])
-        except:
-            return "%s " % (self.val)
+        return f"{self.val} "
 
     def read(self, data, offset):
         global _getULong
@@ -5911,7 +5903,7 @@ class AcisChunkEnumValue(_AcisChunk_):
         return i
 
     def getValue(self):
-        if values:
+        if self.values:
             return self.values.item(self.val)
         return self.val
 
@@ -6100,11 +6092,7 @@ class Header(object):
         self.bodies = 0
         self.flags = 0
         self.prodId = "FreeCAD"
-        self.prodVer = "%s.%s  Build: %s" % (
-            FreeCAD.ConfigGet("BuildVersionMajor"),
-            FreeCAD.ConfigGet("BuildVersionMinor"),
-            FreeCAD.ConfigGet("BuildRevision"),
-        )
+        self.prodVer = "%s.%s  Build: %s"
         self.date = datetime.datetime.now().strftime("%a, %b %d %H:%M:%S %Y")
         self.scale = 1.0
         self.resabs = 1e-06
@@ -6129,7 +6117,7 @@ def getNextText(data):
     m = LENGTH_TEXT.match(data)
     count = int(m.group(1))
     text = m.group(2)[0:count]
-    remaining = m.group(2)[count + 1 :]
+    remaining = m.group(2)[count + 1:]
     return text, remaining
 
 
@@ -6193,7 +6181,7 @@ class AcisReader(object):
         if token.startswith("@"):
             count = int(token[1:])
             self._skipWhiteSpace()
-            text = self._data[self._pos : self._pos + count]
+            text = self._data[self._pos: self._pos + count]
             self._pos += count + 1
             return TAG_UTF8_U16, text
         if token.startswith("$"):
@@ -6234,7 +6222,7 @@ class AcisReader(object):
             start = self._pos
             self._findEnd()
             if start < self._pos:
-                token = self._data[start : self._pos]
+                token = self._data[start: self._pos]
             else:
                 token = None
         return token
@@ -6698,7 +6686,8 @@ RECORD_2_NODE = {
     "mix_UnfoldInfo-mix_Organizaion-attrib": AttribMixOrganizationUnfoldInfo,
     "NamingMatching-attrib": AttribNamingMatching,
     "NMx_Brep_tag-NamingMatching-attrib": AttribNamingMatchingNMxBrepTag,
-    "NMx_Brep_Feature_tag-NMx_Brep_tag-NamingMatching-attrib": AttribNamingMatchingNMxBrepTagFeature,  # (n > 2010) 1 m -1
+    "NMx_Brep_Feature_tag-NMx_Brep_tag-NamingMatching-attrib": AttribNamingMatchingNMxBrepTagFeature,
+    # (n > 2010) 1 m -1
     "NMx_Brep_Name_tag-NMx_Brep_tag-NamingMatching-attrib": AttribNamingMatchingNMxBrepTagName,
     "NMx_BPatch_Tag-NMx_Brep_Name_tag-NMx_Brep_tag-NamingMatching-attrib": AttribNamingMatchingNMxBrepTagNameBPatch,
     "NMx_bend_tag-NMx_Brep_Name_tag-NMx_Brep_tag-NamingMatching-attrib": AttribNamingMatchingNMxBrepTagNameBend,
@@ -6838,3 +6827,28 @@ RECORD_2_NODE = {
     "cface": CFace,
     "cshell": CShell,
 }
+
+
+def resolveNodes(acis):
+    init()
+    bodies = []
+    doAdd = True
+    setReader(acis)
+    for entity in acis.getEntities():
+        node = createNode(entity)
+        if (node):
+            if (doAdd and (entity.name == 'body')):
+                bodies.append(node)
+            if (entity.name in ['Begin-of-ACIS-History-Data', 'End-of-ACIS-data']):
+                doAdd = False
+
+    return bodies
+
+
+def convertModel(step_path):
+    from Acis2Step import export
+
+    acis = getReader()
+    bodies = resolveNodes(acis)
+
+    stepfile = export(acis.name, acis.header, bodies, step_path)
