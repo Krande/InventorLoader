@@ -6829,26 +6829,22 @@ RECORD_2_NODE = {
 }
 
 
-def resolveNodes(acis):
+def get_shapes(acis):
     init()
-    bodies = []
-    doAdd = True
+    shapes = []
     setReader(acis)
     for entity in acis.getEntities():
         node = createNode(entity)
-        if (node):
-            if (doAdd and (entity.name == 'body')):
-                bodies.append(node)
-            if (entity.name in ['Begin-of-ACIS-History-Data', 'End-of-ACIS-data']):
-                doAdd = False
+        if node and hasattr(node, 'shape') and node.shape is not None:
+            shapes.append(node.shape)
 
-    return bodies
+    return shapes
 
 
 def convertModel(step_path):
     from Acis2Step import export
 
     acis = getReader()
-    bodies = resolveNodes(acis)
+    bodies = get_shapes(acis)
 
     stepfile = export(acis.name, acis.header, bodies, step_path)
